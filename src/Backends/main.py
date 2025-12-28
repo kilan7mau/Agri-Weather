@@ -148,7 +148,7 @@ async def predict_hourly(request: CityRequest):
 
 @app.post("/api/predict/daily")
 async def predict_daily(request: CityRequest):
-    """Predict daily weather code"""
+    """Predict daily weather code with full weather parameters"""
     try:
         weather_daily = get_weather_data_daily(request.city)
         df_daily = process_daily_weather_data(weather_daily)
@@ -158,14 +158,39 @@ async def predict_daily(request: CityRequest):
 
         weather_description = decode_wmo_code_batch(predictions_daily)
 
-        result = df_daily[['time']].copy()
-        result['weather_code'] = predictions_daily
-        result['weather_description'] = weather_description
+        # Helper function to safely convert to float
+        def safe_float(value):
+            if pd.isna(value) or value is None:
+                return 0.0
+            return float(value)
+
+        # Extract all weather parameters
+        raw_data = {
+            "temperature_2m_mean": safe_float(df_daily.iloc[0]['temperature_2m_mean']),
+            "temperature_2m_max": safe_float(df_daily.iloc[0]['temperature_2m_max']),
+            "temperature_2m_min": safe_float(df_daily.iloc[0]['temperature_2m_min']),
+            "apparent_temperature_mean": safe_float(df_daily.iloc[0]['apparent_temperature_mean']),
+            "apparent_temperature_max": safe_float(df_daily.iloc[0]['apparent_temperature_max']),
+            "apparent_temperature_min": safe_float(df_daily.iloc[0]['apparent_temperature_min']),
+            "dew_point_2m_mean": safe_float(df_daily.iloc[0]['dew_point_2m_mean']),
+            "precipitation_sum": safe_float(df_daily.iloc[0]['precipitation_sum']),
+            "cloud_cover_mean": safe_float(df_daily.iloc[0]['cloud_cover_mean']),
+            "relative_humidity_2m_mean": safe_float(df_daily.iloc[0]['relative_humidity_2m_mean']),
+            "wind_gusts_10m_mean": safe_float(df_daily.iloc[0]['wind_gusts_10m_mean']),
+            "wind_speed_10m_mean": safe_float(df_daily.iloc[0]['wind_speed_10m_mean']),
+            "winddirection_10m_dominant": safe_float(df_daily.iloc[0]['winddirection_10m_dominant']),
+            "surface_pressure_mean": safe_float(df_daily.iloc[0]['surface_pressure_mean']),
+            "pressure_msl_mean": safe_float(df_daily.iloc[0]['pressure_msl_mean']),
+            "daylight_duration": safe_float(df_daily.iloc[0]['daylight_duration']),
+            "sunshine_duration": safe_float(df_daily.iloc[0]['sunshine_duration'])
+        }
 
         return {
             "city": request.city,
-            "prediction": result.to_dict(orient="records")[0],
-            "raw_data": df_daily.to_dict(orient="records")[0]
+            "time": str(df_daily.iloc[0]['time']),
+            "weather_code": int(predictions_daily[0]),
+            "weather_description": weather_description[0],
+            "raw_data": raw_data
         }
 
     except Exception as e:

@@ -1,11 +1,53 @@
 import { Cloud, Wind, Droplets, Gauge, Eye } from 'lucide-react';
 import { useCity } from '../../contexts/CityContext';
-import { getWeatherByCity } from '../../lib/weatherData';
+import { useState, useEffect } from 'react';
+import { getDailyWeather, getWindDirection, type DailyWeatherResponse } from '../../lib/weatherApi';
 
 export default function WeatherToday() {
   const { selectedCity } = useCity();
-  const currentWeather = getWeatherByCity(selectedCity);
+  const [weatherData, setWeatherData] = useState<DailyWeatherResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const currentTime = new Date().toLocaleString();
+
+  useEffect(() => {
+    const fetchWeather = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getDailyWeather(selectedCity);
+        setWeatherData(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch weather data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWeather();
+  }, [selectedCity]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error || !weatherData) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-500 mb-2">Error loading weather data</p>
+          <p className="text-gray-600 text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const { raw_data, weather_description } = weatherData;
+  const windDir = getWindDirection(raw_data.winddirection_10m_dominant || 0);
 
   return (
     <div className="space-y-6">
@@ -13,18 +55,18 @@ export default function WeatherToday() {
         <div className="bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl p-8 text-white shadow-lg">
           <div className="flex items-start justify-between mb-6">
             <div>
-              <h2 className="text-5xl font-bold mb-2">{currentWeather.temperature}°C</h2>
-              <p className="text-xl opacity-90">{currentWeather.condition}</p>
+              <h2 className="text-5xl font-bold mb-2">{Math.round(raw_data.temperature_2m_mean || 0)}°C</h2>
+              <p className="text-xl opacity-90">{weather_description}</p>
             </div>
             <Cloud className="w-20 h-20 opacity-80" />
           </div>
 
           <div className="space-y-2 text-sm opacity-90">
-            <p>Feels Like: {currentWeather.feelsLike}°C</p>
-            <p>Forecast: {currentWeather.forecast.high} / {currentWeather.forecast.low}°C</p>
+            <p>Feels Like: {Math.round(raw_data.apparent_temperature_mean || 0)}°C</p>
+            <p>Forecast: {Math.round(raw_data.temperature_2m_max || 0)} / {Math.round(raw_data.temperature_2m_min || 0)}°C</p>
             <div className="flex items-center gap-2">
               <Wind className="w-4 h-4" />
-              <span>Wind: {currentWeather.wind.speed} km/h from {currentWeather.wind.direction}</span>
+              <span>Wind: {Math.round(raw_data.wind_speed_10m_mean || 0)} km/h from {windDir}</span>
             </div>
           </div>
         </div>
@@ -34,7 +76,7 @@ export default function WeatherToday() {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-gray-600">Location:</span>
-              <span className="font-medium text-gray-900">{currentWeather.location}</span>
+              <span className="font-medium text-gray-900">{selectedCity}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-gray-600">Current Time:</span>
@@ -42,11 +84,11 @@ export default function WeatherToday() {
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-gray-600">Latest Report:</span>
-              <span className="font-medium text-gray-900">{currentTime}</span>
+              <span className="font-medium text-gray-900">{weatherData.time}</span>
             </div>
             <div className="flex justify-between py-2">
-              <span className="text-gray-600">Visibility:</span>
-              <span className="font-medium text-gray-900">N/A</span>
+              <span className="text-gray-600">Cloud Cover:</span>
+              <span className="font-medium text-gray-900">{Math.round(raw_data.cloud_cover_mean || 0)}%</span>
             </div>
           </div>
         </div>
@@ -74,7 +116,7 @@ export default function WeatherToday() {
             <Gauge className="w-5 h-5 text-blue-600" />
             <span className="text-sm text-gray-600">Pressure</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{currentWeather.pressure} mbar</p>
+          <p className="text-2xl font-bold text-gray-900">{Math.round(raw_data.surface_pressure_mean || 0)} mbar</p>
         </div>
 
         <div className="bg-white rounded-xl p-6 shadow-lg">
@@ -82,7 +124,7 @@ export default function WeatherToday() {
             <Droplets className="w-5 h-5 text-blue-600" />
             <span className="text-sm text-gray-600">Humidity</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{currentWeather.humidity}%</p>
+          <p className="text-2xl font-bold text-gray-900">{Math.round(raw_data.relative_humidity_2m_mean || 0)}%</p>
         </div>
 
         <div className="bg-white rounded-xl p-6 shadow-lg">
@@ -90,15 +132,15 @@ export default function WeatherToday() {
             <Droplets className="w-5 h-5 text-blue-600" />
             <span className="text-sm text-gray-600">Dew Point</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{currentWeather.dewPoint}°C</p>
+          <p className="text-2xl font-bold text-gray-900">{Math.round(raw_data.dew_point_2m_mean || 0)}°C</p>
         </div>
 
         <div className="bg-white rounded-xl p-6 shadow-lg">
           <div className="flex items-center gap-3 mb-2">
             <Eye className="w-5 h-5 text-blue-600" />
-            <span className="text-sm text-gray-600">Visibility</span>
+            <span className="text-sm text-gray-600">Precipitation</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">N/A</p>
+          <p className="text-2xl font-bold text-gray-900">{(raw_data.precipitation_sum || 0).toFixed(1)} mm</p>
         </div>
       </div>
     </div>

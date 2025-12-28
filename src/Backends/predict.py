@@ -293,7 +293,7 @@ def predict_weather_hourly(prepared_data_hourly):
 
     return predictions_hourly
 
-def predict_weather_code(prepared_data_daily):
+def predict_weather_daily(prepared_data_daily):
     """
     Dự đoán mã thời tiết dựa trên dữ liệu đã được chuẩn bị.
 
@@ -307,6 +307,64 @@ def predict_weather_code(prepared_data_daily):
     predictions_encoded_daily = predaily_model.predict(prepared_data_daily)
     predictions_daily = labele_encoder_daily.inverse_transform(predictions_encoded_daily)
     return predictions_daily.tolist()
+
+
+def decode_wmo_code(code):
+    """
+    Chuyển đổi mã WMO weather code thành mô tả thời tiết bằng tiếng Anh.
+
+    Args:
+        code (int): Mã WMO weather code (0-99)
+
+    Returns:
+        str: Mô tả thời tiết tương ứng
+    """
+    wmo_descriptions = {
+        0: "Clear sky",
+        1: "Mainly clear",
+        2: "Partly cloudy",
+        3: "Overcast",
+        45: "Fog",
+        48: "Depositing rime fog",
+        51: "Light drizzle",
+        53: "Moderate drizzle",
+        55: "Dense drizzle",
+        56: "Light freezing drizzle",
+        57: "Dense freezing drizzle",
+        61: "Slight rain",
+        63: "Moderate rain",
+        65: "Heavy rain",
+        66: "Light freezing rain",
+        67: "Heavy freezing rain",
+        71: "Slight snow fall",
+        73: "Moderate snow fall",
+        75: "Heavy snow fall",
+        77: "Snow grains",
+        80: "Slight rain showers",
+        81: "Moderate rain showers",
+        82: "Violent rain showers",
+        85: "Slight snow showers",
+        86: "Heavy snow showers",
+        95: "Thunderstorm",
+        96: "Thunderstorm with slight hail",
+        99: "Thunderstorm with heavy hail"
+    }
+
+    return wmo_descriptions.get(code, f"Unknown weather code: {code}")
+
+
+def decode_wmo_code_batch(codes):
+    """
+    Chuyển đổi nhiều mã WMO weather code thành mô tả.
+
+    Args:
+        codes (list or array): Danh sách các mã WMO
+
+    Returns:
+        list: Danh sách các mô tả thời tiết
+    """
+    return [decode_wmo_code(int(code)) for code in codes]
+
 
 if __name__ == "__main__":
     import sys
@@ -415,7 +473,7 @@ if __name__ == "__main__":
 
     # Make daily weather code prediction
         print(f"\n🔮 Predicting daily weather codes...")
-        predictions_daily = predict_weather_code(prepared_daily)
+        predictions_daily = predict_weather_daily(prepared_daily)
 
     # Create result DataFrame
         daily_result = df_daily[['time']].copy()

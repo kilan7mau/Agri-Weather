@@ -55,7 +55,7 @@ def get_weather_data_24hour(location):
     url = (
         f"https://api.open-meteo.com/v1/forecast?"
         f"latitude={lat}&longitude={lon}&"
-        f"hourly=apparent_temperature,dew_point_2m,precipitation,cloud_cover,"
+        f"hourly=temperature_2m,apparent_temperature,dew_point_2m,precipitation,cloud_cover,"
         f"relative_humidity_2m,wind_gusts_10m,wind_speed_10m,wind_direction_10m,"
         f"surface_pressure,pressure_msl&"
         f"timezone=Asia%2FBangkok&forecast_days=3"

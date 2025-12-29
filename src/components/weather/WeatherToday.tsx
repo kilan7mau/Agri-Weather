@@ -1,53 +1,39 @@
-import { Cloud, Wind, Droplets, Gauge, Eye } from 'lucide-react';
-import { useCity } from '../../contexts/CityContext';
-import { useState, useEffect } from 'react';
-import { getDailyWeather, getWindDirection, type DailyWeatherResponse } from '../../lib/weatherApi';
+import {
+  Cloud,
+  Wind,
+  Droplets,
+  Gauge,
+  Umbrella,
+  Sun,
+  CloudSun,
+  CloudFog,
+  CloudDrizzle,
+  CloudRain,
+  CloudSnow,
+  CloudLightning,
+  LucideIcon,
+} from 'lucide-react';
 
-export default function WeatherToday() {
+import { useCity } from '../../contexts/CityContext';
+import { getWindDirection, getWeatherIcon, type DailyWeatherResponse } from '../../lib/weatherApi';
+
+interface WeatherTodayProps {
+  data: DailyWeatherResponse;
+}
+
+export default function WeatherToday({ data }: WeatherTodayProps) {
   const { selectedCity } = useCity();
-  const [weatherData, setWeatherData] = useState<DailyWeatherResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const currentTime = new Date().toLocaleString();
 
-  useEffect(() => {
-    const fetchWeather = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getDailyWeather(selectedCity);
-        setWeatherData(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch weather data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchWeather();
-  }, [selectedCity]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  if (error || !weatherData) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <p className="text-red-500 mb-2">Error loading weather data</p>
-          <p className="text-gray-600 text-sm">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const { raw_data, weather_description } = weatherData;
+  const { raw_data, weather_description, weather_code } = data;
   const windDir = getWindDirection(raw_data.winddirection_10m_dominant || 0);
+  
+  // Get the appropriate weather icon component
+  const iconName = getWeatherIcon(weather_code);
+  const icons: Record<string, LucideIcon> = {
+    Sun, Cloud, CloudSun, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning
+  };
+  const WeatherIcon = icons[iconName] || Cloud;
 
   return (
     <div className="space-y-6">
@@ -58,7 +44,7 @@ export default function WeatherToday() {
               <h2 className="text-5xl font-bold mb-2">{Math.round(raw_data.temperature_2m_mean || 0)}°C</h2>
               <p className="text-xl opacity-90">{weather_description}</p>
             </div>
-            <Cloud className="w-20 h-20 opacity-80" />
+            <WeatherIcon className="w-20 h-20 opacity-80" />
           </div>
 
           <div className="space-y-2 text-sm opacity-90">
@@ -84,12 +70,12 @@ export default function WeatherToday() {
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-gray-600">Latest Report:</span>
-              <span className="font-medium text-gray-900">{weatherData.time}</span>
+              <span className="font-medium text-gray-900">{data.time}</span>
             </div>
-            <div className="flex justify-between py-2">
-              <span className="text-gray-600">Cloud Cover:</span>
-              <span className="font-medium text-gray-900">{Math.round(raw_data.cloud_cover_mean || 0)}%</span>
-            </div>
+            {/*<div className="flex justify-between py-2">*/}
+            {/*  <span className="text-gray-600">Cloud Cover:</span>*/}
+            {/*  <span className="font-medium text-gray-900">{Math.round(raw_data.cloud_cover_mean || 0)}%</span>*/}
+            {/*</div>*/}
           </div>
         </div>
 
@@ -137,7 +123,7 @@ export default function WeatherToday() {
 
         <div className="bg-white rounded-xl p-6 shadow-lg">
           <div className="flex items-center gap-3 mb-2">
-            <Eye className="w-5 h-5 text-blue-600" />
+            <Umbrella className="w-5 h-5 text-blue-600" />
             <span className="text-sm text-gray-600">Precipitation</span>
           </div>
           <p className="text-2xl font-bold text-gray-900">{(raw_data.precipitation_sum || 0).toFixed(1)} mm</p>

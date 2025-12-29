@@ -126,11 +126,12 @@ def get_weather_data_daily(location):
     lat = coord["lat"]
     lon = coord["lon"]
 
-    url = (f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=temperature_2m_mean,"
-           f"temperature_2m_max,temperature_2m_min,apparent_temperature_mean,apparent_temperature_max,apparent_temperature_min,"
-           f"dew_point_2m_mean,precipitation_sum,cloud_cover_mean,relative_humidity_2m_mean,wind_gusts_10m_mean,wind_speed_10m_mean,"
-           f"winddirection_10m_dominant,surface_pressure_mean,pressure_msl_mean,daylight_duration,"
-           f"sunshine_duration&timezone=Asia%2FBangkok&past_days=31&forecast_days=1")
+    url = (f"https://api.open-meteo.com/v1/forecast?"
+           f"latitude={lat}&longitude={lon}&"
+           f"daily=temperature_2m_mean,temperature_2m_max,"
+           f"temperature_2m_min,apparent_temperature_mean,apparent_temperature_max,apparent_temperature_min,dew_point_2m_mean,"
+           f"precipitation_sum,cloud_cover_mean,relative_humidity_2m_mean,wind_gusts_10m_mean,wind_speed_10m_mean,winddirection_10m_dominant,"
+           f"surface_pressure_mean,pressure_msl_mean,daylight_duration,sunshine_duration&timezone=Asia%2FBangkok&forecast_days=1")
     try:
         with urllib.request.urlopen(url) as response:
             data = json.load(response)

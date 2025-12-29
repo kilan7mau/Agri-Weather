@@ -232,18 +232,21 @@ async def get_raw_weather_all(request: CityRequest):
         raise HTTPException(status_code=500, detail=str(e))
 @app.post("/api/predict/all")
 async def predict_all(request: CityRequest):
-    """Get all predictions at once (7-day, hourly, daily)"""
+    """Get all predictions at once (7-day, hourly, daily) - Optimized for single API call"""
     try:
         import predict
 
+        # Fetch all weather data in parallel (conceptually)
         weather_30d = get_weather_data_30(request.city)
         weather_24h = get_weather_data_24hour(request.city)
         weather_daily = get_weather_data_daily(request.city)
 
+        # Process data
         df_30d = process_30day_weather_data(weather_30d)
         df_hourly = process_hourly_weather_data(weather_24h)
         df_daily = process_daily_weather_data(weather_daily)
 
+        # Make all predictions
         predictions_7day = predict_weather_7days(
             df_30d,
             predict.scaler_x,
@@ -259,35 +262,128 @@ async def predict_all(request: CityRequest):
         predictions_daily = predict_weather_daily(prepared_daily)
         daily_description = decode_wmo_code_batch(predictions_daily)
 
+        # Helper function to safely convert to float
+        def safe_float(value):
+            if pd.isna(value) or value is None:
+                return 0.0
+            return float(value)
+
+        # Predict weather_code for each of the 7 days using daily model
+        import numpy as np
+        seven_day_with_codes = []
+        
+        for i in range(len(predictions_7day)):
+            day_data = predictions_7day.iloc[i]
+            
+            # Calculate sin_doy and cos_doy from the time field
+            day_time = pd.to_datetime(day_data['time'])
+            day_of_year = day_time.dayofyear
+            sin_doy = np.sin(2 * np.pi * day_of_year / 365.25)
+            cos_doy = np.cos(2 * np.pi * day_of_year / 365.25)
+            
+            # Create a DataFrame with one row containing the predicted day's data
+            # Include 'time' column FIRST (required by process_input_daily)
+            day_features = pd.DataFrame([{
+                'time': day_time,
+                'temperature_2m_mean': day_data['temperature_2m_mean'],
+                'temperature_2m_max': day_data['temperature_2m_max'],
+                'temperature_2m_min': day_data['temperature_2m_min'],
+                'apparent_temperature_mean': day_data['apparent_temperature_mean'],
+                'apparent_temperature_max': day_data['apparent_temperature_max'],
+                'apparent_temperature_min': day_data['apparent_temperature_min'],
+                'dew_point_2m_mean': day_data['dew_point_2m_mean'],
+                'precipitation_sum': day_data['precipitation_sum'],
+                'cloud_cover_mean': day_data['cloud_cover_mean'],
+                'relative_humidity_2m_mean': day_data['relative_humidity_2m_mean'],
+                'wind_gusts_10m_mean': day_data['wind_gusts_10m_mean'],
+                'wind_speed_10m_mean': day_data['wind_speed_10m_mean'],
+                'winddirection_10m_dominant': day_data['winddirection_10m_dominant'],
+                'surface_pressure_mean': day_data['surface_pressure_mean'],
+                'pressure_msl_mean': day_data['pressure_msl_mean'],
+                'daylight_duration': day_data['daylight_duration'],
+                'sunshine_duration': day_data['sunshine_duration'],
+                'sin_doy': sin_doy,
+                'cos_doy': cos_doy
+            }])
+            
+            # Predict weather code for this day
+            prepared_day = process_input_daily(day_features)
+            weather_code = predict_weather_daily(prepared_day)[0]
+            weather_desc = decode_wmo_code_batch([weather_code])[0]
+            
+            # Add weather_code and description to the day data (exclude sin_doy, cos_doy from response)
+            day_dict = {
+                'time': day_time.strftime('%Y-%m-%d'),  # Format as YYYY-MM-DD (same as today)
+                'temperature_2m_mean': safe_float(day_data['temperature_2m_mean']),
+                'temperature_2m_max': safe_float(day_data['temperature_2m_max']),
+                'temperature_2m_min': safe_float(day_data['temperature_2m_min']),
+                'apparent_temperature_mean': safe_float(day_data['apparent_temperature_mean']),
+                'apparent_temperature_max': safe_float(day_data['apparent_temperature_max']),
+                'apparent_temperature_min': safe_float(day_data['apparent_temperature_min']),
+                'dew_point_2m_mean': safe_float(day_data['dew_point_2m_mean']),
+                'precipitation_sum': safe_float(day_data['precipitation_sum']),
+                'cloud_cover_mean': safe_float(day_data['cloud_cover_mean']),
+                'relative_humidity_2m_mean': safe_float(day_data['relative_humidity_2m_mean']),
+                'wind_gusts_10m_mean': safe_float(day_data['wind_gusts_10m_mean']),
+                'wind_speed_10m_mean': safe_float(day_data['wind_speed_10m_mean']),
+                'winddirection_10m_dominant': safe_float(day_data['winddirection_10m_dominant']),
+                'surface_pressure_mean': safe_float(day_data['surface_pressure_mean']),
+                'pressure_msl_mean': safe_float(day_data['pressure_msl_mean']),
+                'daylight_duration': safe_float(day_data['daylight_duration']),
+                'sunshine_duration': safe_float(day_data['sunshine_duration']),
+                'weather_code': int(weather_code),
+                'weather_description': weather_desc
+            }
+            seven_day_with_codes.append(day_dict)
+
+        # Build response with all data
         return {
             "city": request.city,
-            "seven_day_forecast": predictions_7day.to_dict(orient="records"),
+            "seven_day_forecast": seven_day_with_codes,
             "hourly_forecast": [
                 {
-                    "time": df_hourly.iloc[i]['time'],
+                    "time": str(df_hourly.iloc[i]['time']),
                     "weather_code": int(predictions_hourly[i]),
                     "weather_description": hourly_descriptions[i],
                     "raw_data": {
-                        "temperature_2m": df_hourly.iloc[i]['temperature_2m'],
-                        "apparent_temperature": df_hourly.iloc[i]['apparent_temperature'],
-                        "dew_point_2m": df_hourly.iloc[i]['dew_point_2m'],
-                        "precipitation": df_hourly.iloc[i]['precipitation'],
-                        "cloud_cover": df_hourly.iloc[i]['cloud_cover'],
-                        "relative_humidity_2m": df_hourly.iloc[i]['relative_humidity_2m'],
-                        "wind_gusts_10m": df_hourly.iloc[i]['wind_gusts_10m'],
-                        "wind_speed_10m": df_hourly.iloc[i]['wind_speed_10m'],
-                        "wind_direction_10m": df_hourly.iloc[i]['wind_direction_10m'],
-                        "surface_pressure": df_hourly.iloc[i]['surface_pressure'],
-                        "pressure_msl": df_hourly.iloc[i]['pressure_msl']
+                        "temperature_2m": safe_float(df_hourly.iloc[i]['temperature_2m']),
+                        "apparent_temperature": safe_float(df_hourly.iloc[i]['apparent_temperature']),
+                        "dew_point_2m": safe_float(df_hourly.iloc[i]['dew_point_2m']),
+                        "precipitation": safe_float(df_hourly.iloc[i]['precipitation']),
+                        "cloud_cover": safe_float(df_hourly.iloc[i]['cloud_cover']),
+                        "relative_humidity_2m": safe_float(df_hourly.iloc[i]['relative_humidity_2m']),
+                        "wind_gusts_10m": safe_float(df_hourly.iloc[i]['wind_gusts_10m']),
+                        "wind_speed_10m": safe_float(df_hourly.iloc[i]['wind_speed_10m']),
+                        "wind_direction_10m": safe_float(df_hourly.iloc[i]['wind_direction_10m']),
+                        "surface_pressure": safe_float(df_hourly.iloc[i]['surface_pressure']),
+                        "pressure_msl": safe_float(df_hourly.iloc[i]['pressure_msl'])
                     }
                 }
                 for i in range(len(predictions_hourly))
             ],
             "today_forecast": {
-                "time": df_daily.iloc[0]['time'],
+                "time": str(df_daily.iloc[0]['time']),
                 "weather_code": int(predictions_daily[0]),
                 "weather_description": daily_description[0],
-                "raw_data": df_daily.to_dict(orient="records")[0]
+                "raw_data": {
+                    "temperature_2m_mean": safe_float(df_daily.iloc[0]['temperature_2m_mean']),
+                    "temperature_2m_max": safe_float(df_daily.iloc[0]['temperature_2m_max']),
+                    "temperature_2m_min": safe_float(df_daily.iloc[0]['temperature_2m_min']),
+                    "apparent_temperature_mean": safe_float(df_daily.iloc[0]['apparent_temperature_mean']),
+                    "apparent_temperature_max": safe_float(df_daily.iloc[0]['apparent_temperature_max']),
+                    "apparent_temperature_min": safe_float(df_daily.iloc[0]['apparent_temperature_min']),
+                    "dew_point_2m_mean": safe_float(df_daily.iloc[0]['dew_point_2m_mean']),
+                    "precipitation_sum": safe_float(df_daily.iloc[0]['precipitation_sum']),
+                    "cloud_cover_mean": safe_float(df_daily.iloc[0]['cloud_cover_mean']),
+                    "relative_humidity_2m_mean": safe_float(df_daily.iloc[0]['relative_humidity_2m_mean']),
+                    "wind_gusts_10m_mean": safe_float(df_daily.iloc[0]['wind_gusts_10m_mean']),
+                    "wind_speed_10m_mean": safe_float(df_daily.iloc[0]['wind_speed_10m_mean']),
+                    "winddirection_10m_dominant": safe_float(df_daily.iloc[0]['winddirection_10m_dominant']),
+                    "surface_pressure_mean": safe_float(df_daily.iloc[0]['surface_pressure_mean']),
+                    "pressure_msl_mean": safe_float(df_daily.iloc[0]['pressure_msl_mean']),
+                    "daylight_duration": safe_float(df_daily.iloc[0]['daylight_duration']),
+                    "sunshine_duration": safe_float(df_daily.iloc[0]['sunshine_duration'])
+                }
             }
         }
 

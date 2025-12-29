@@ -1,61 +1,30 @@
-import { Cloud, CloudRain, Sun, Droplets, Wind, CloudDrizzle, CloudSnow } from 'lucide-react';
-import { useCity } from '../../contexts/CityContext';
-import { useState, useEffect } from 'react';
-import { getSevenDayWeather, getWindDirection, type SevenDayWeatherResponse } from '../../lib/weatherApi';
+import { Cloud, CloudRain, Sun, CloudSun, CloudFog, CloudSnow, CloudLightning, CloudDrizzle, Wind, Umbrella, LucideIcon } from 'lucide-react';
+import { getWindDirection, getWeatherIcon, type SevenDayItem, type WeatherRawData } from '../../lib/weatherApi';
 
-export default function SevenDayForecast() {
-  const { selectedCity } = useCity();
-  const [weatherData, setWeatherData] = useState<SevenDayWeatherResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface SevenDayForecastProps {
+  todayData: {
+    time: string;
+    weather_code: number;
+    weather_description: string;
+    raw_data: WeatherRawData;
+  };
+  forecastData: SevenDayItem[];
+}
 
-  useEffect(() => {
-    const fetchWeather = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getSevenDayWeather(selectedCity);
-        setWeatherData(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch weather data');
-      } finally {
-        setLoading(false);
-      }
-    };
+export default function SevenDayForecast({ todayData, forecastData }: SevenDayForecastProps) {
+  // Icon map for converting icon name to component
+  const iconMap: Record<string, LucideIcon> = {
+    Sun, Cloud, CloudSun, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning
+  };
 
-    fetchWeather();
-  }, [selectedCity]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  if (error || !weatherData) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <p className="text-red-500 mb-2">Error loading weather data</p>
-          <p className="text-gray-600 text-sm">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const getWeatherIcon = (temp: number, precipitation: number) => {
-    if (precipitation > 20) return CloudRain;
-    if (precipitation > 5) return CloudDrizzle;
-    if (temp < 0) return CloudSnow;
-    if (temp > 30) return Sun;
-    if (precipitation > 0) return Cloud;
-    return Sun;
+  // Get icon component based on weather_code (now available for all days!)
+  const getIconComponent = (weatherCode: number): LucideIcon => {
+    const iconName = getWeatherIcon(weatherCode);
+    return iconMap[iconName] || Cloud;
   };
 
   const getDayName = (dateStr: string, index: number) => {
-    if (index === 0) return 'Today';
+    if (index === 0) return 'Tomorrow';
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { weekday: 'long' });
   };
@@ -65,77 +34,103 @@ export default function SevenDayForecast() {
     return date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
   };
 
-  const forecast = weatherData.predictions;
-  const today = forecast[0];
-  const todayIcon = getWeatherIcon(today.temperature_2m_max, today.precipitation_sum);
+  const TodayIcon = getIconComponent(todayData.weather_code);
 
   return (
     <div className="space-y-6">
+      {/* Today Card - Using today_forecast data */}
       <div className="bg-gradient-to-r from-teal-400 to-teal-600 rounded-2xl p-8 text-white shadow-lg">
         <div className="grid md:grid-cols-2 gap-8">
           <div>
-            {(() => {
-              const Icon = todayIcon;
-              return <Icon className="w-16 h-16 mb-4 opacity-80" />;
-            })()}
+            <TodayIcon className="w-16 h-16 mb-4 opacity-80" />
             <p className="text-5xl font-bold mb-2">
-              {Math.round(today.temperature_2m_max)} / {Math.round(today.temperature_2m_min)}°C
+              {Math.round(todayData.raw_data.temperature_2m_max || 0)} / {Math.round(todayData.raw_data.temperature_2m_min || 0)}°C
             </p>
             <p className="text-xl opacity-90">
-              {today.precipitation_sum > 20 ? 'Rainy' : today.precipitation_sum > 5 ? 'Partly Cloudy' : 'Clear'}
+              {todayData.weather_description}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="opacity-75 text-sm">Feels Like:</p>
-              <p className="text-2xl font-semibold">{Math.round(today.apparent_temperature_max)}°C</p>
+              <p className="text-2xl font-semibold">{Math.round(todayData.raw_data.apparent_temperature_max || 0)}°C</p>
             </div>
             <div>
               <p className="opacity-75 text-sm">Wind Gust:</p>
-              <p className="text-2xl font-semibold">{Math.round(today.wind_gusts_10m_max)} km/h</p>
+              <p className="text-2xl font-semibold">{Math.round(todayData.raw_data.wind_gusts_10m_mean || 0)} km/h</p>
             </div>
             <div>
               <p className="opacity-75 text-sm">Precipitation:</p>
-              <p className="text-2xl font-semibold">Rain: {today.precipitation_sum.toFixed(1)}mm</p>
+              <p className="text-2xl font-semibold">Rain: {(todayData.raw_data.precipitation_sum || 0).toFixed(1)}mm</p>
             </div>
             <div>
               <p className="opacity-75 text-sm">Wind:</p>
               <p className="text-2xl font-semibold">
-                {Math.round(today.wind_speed_10m_max)} km/h {getWindDirection(today.wind_direction_10m_dominant)}
+                {Math.round(todayData.raw_data.wind_speed_10m_mean || 0)} km/h {getWindDirection(todayData.raw_data.winddirection_10m_dominant || 0)}
               </p>
             </div>
           </div>
         </div>
       </div>
 
+      {/* 8-Day Forecast List - Today + 7 next days */}
       <div className="bg-white rounded-2xl p-6 shadow-md">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">7-Day Extended Forecast</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">8-Day Extended Forecast</h3>
         <div className="space-y-3">
-          {forecast.map((day, index) => {
-            const Icon = getWeatherIcon(day.temperature_2m_max, day.precipitation_sum);
-            const dayName = getDayName(day.date, index);
-            const dateFormatted = formatDate(day.date);
-            const condition = day.precipitation_sum > 20 ? 'Rain' : day.precipitation_sum > 5 ? 'Partly Cloudy' : day.temperature_2m_max > 30 ? 'Hot & Clear' : 'Clear';
-            const windDir = getWindDirection(day.wind_direction_10m_dominant);
+          {/* Today Row */}
+          <div className="flex items-center gap-4 p-4 rounded-lg transition-colors bg-blue-50 border-l-4 border-blue-500">
+            <div className="min-w-fit">
+              <p className="font-semibold text-blue-600">Today</p>
+              <p className="text-sm text-gray-600">{formatDate(todayData.time)}</p>
+            </div>
+
+            <TodayIcon className="w-8 h-8 text-gray-400 mx-2" />
+
+            <div className="flex-1">
+              <p className="font-medium text-gray-900">{todayData.weather_description}</p>
+            </div>
+
+            <div className="flex items-center gap-2 min-w-fit">
+              <div className="flex gap-1 w-24">
+                <div className="flex-1 h-2 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500"></div>
+              </div>
+              <span className="text-sm font-semibold text-gray-900 w-12">{Math.round(todayData.raw_data.temperature_2m_max || 0)}°</span>
+              <span className="text-sm text-gray-600 w-12">{Math.round(todayData.raw_data.temperature_2m_min || 0)}°</span>
+            </div>
+
+            <div className="flex items-center gap-4 min-w-fit pl-4 border-l border-gray-200">
+              <div className="text-center text-sm">
+                <Umbrella className="w-4 h-4 inline mr-1 text-blue-500" />
+                <span className="text-gray-600">{(todayData.raw_data.precipitation_sum || 0).toFixed(1)}mm</span>
+              </div>
+              <div className="text-center text-sm">
+                <Wind className="w-4 h-4 inline mr-1 text-gray-500" />
+                <span className="text-gray-600">{Math.round(todayData.raw_data.wind_speed_10m_mean || 0)} km/h {getWindDirection(todayData.raw_data.winddirection_10m_dominant || 0)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Next 7 Days */}
+          {forecastData.map((day, index) => {
+            const Icon = getIconComponent(day.weather_code);
+            const dayName = getDayName(day.time, index);
+            const dateFormatted = formatDate(day.time);
+            const windDir = getWindDirection(day.winddirection_10m_dominant);
             
             return (
               <div
                 key={index}
-                className={`flex items-center gap-4 p-4 rounded-lg transition-colors ${
-                  index === 0 ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-gray-50'
-                }`}
+                className="flex items-center gap-4 p-4 rounded-lg transition-colors hover:bg-gray-50"
               >
                 <div className="min-w-fit">
-                  <p className={`font-semibold ${index === 0 ? 'text-blue-600' : 'text-gray-900'}`}>
-                    {dayName}
-                  </p>
+                  <p className="font-semibold text-gray-900">{dayName}</p>
                   <p className="text-sm text-gray-600">{dateFormatted}</p>
                 </div>
 
                 <Icon className="w-8 h-8 text-gray-400 mx-2" />
 
                 <div className="flex-1">
-                  <p className="font-medium text-gray-900">{condition}</p>
+                  <p className="font-medium text-gray-900">{day.weather_description}</p>
                 </div>
 
                 <div className="flex items-center gap-2 min-w-fit">
@@ -150,12 +145,12 @@ export default function SevenDayForecast() {
 
                 <div className="flex items-center gap-4 min-w-fit pl-4 border-l border-gray-200">
                   <div className="text-center text-sm">
-                    <Droplets className="w-4 h-4 inline mr-1 text-blue-500" />
+                    <Umbrella className="w-4 h-4 inline mr-1 text-blue-500" />
                     <span className="text-gray-600">{day.precipitation_sum.toFixed(1)}mm</span>
                   </div>
                   <div className="text-center text-sm">
                     <Wind className="w-4 h-4 inline mr-1 text-gray-500" />
-                    <span className="text-gray-600">{Math.round(day.wind_speed_10m_max)} km/h {windDir}</span>
+                    <span className="text-gray-600">{Math.round(day.wind_speed_10m_mean)} km/h {windDir}</span>
                   </div>
                 </div>
               </div>
@@ -166,3 +161,4 @@ export default function SevenDayForecast() {
     </div>
   );
 }
+

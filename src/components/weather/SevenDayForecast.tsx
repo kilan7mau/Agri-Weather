@@ -23,6 +23,24 @@ export default function SevenDayForecast({ todayData, forecastData }: SevenDayFo
     return iconMap[iconName] || Cloud;
   };
 
+  // Helper function to generate temperature gradient bar based on actual temp
+  const getTempGradient = (tempMax: number, tempMin: number) => {
+    // Define color stops based on temperature
+    const getColorForTemp = (temp: number) => {
+      if (temp >= 35) return '#dc2626'; // red-600 (very hot)
+      if (temp >= 30) return '#f59e0b'; // amber-500 (hot)
+      if (temp >= 25) return '#fbbf24'; // yellow-400 (warm)
+      if (temp >= 20) return '#10b981'; // emerald-500 (comfortable)
+      if (temp >= 15) return '#3b82f6'; // blue-500 (cool)
+      return '#6366f1'; // indigo-500 (cold)
+    };
+
+    const maxColor = getColorForTemp(tempMax);
+    const minColor = getColorForTemp(tempMin);
+
+    return `linear-gradient(to right, ${minColor} 0%, ${maxColor} 100%)`;
+  };
+
   const getDayName = (dateStr: string, index: number) => {
     if (index === 0) return 'Tomorrow';
     const date = new Date(dateStr);
@@ -92,7 +110,10 @@ export default function SevenDayForecast({ todayData, forecastData }: SevenDayFo
 
             <div className="flex items-center gap-2 min-w-fit">
               <div className="flex gap-1 w-24">
-                <div className="flex-1 h-2 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500"></div>
+                <div 
+                  className="flex-1 h-2 rounded-full" 
+                  style={{ background: getTempGradient(todayData.raw_data.temperature_2m_max || 0, todayData.raw_data.temperature_2m_min || 0) }}
+                ></div>
               </div>
               <span className="text-sm font-semibold text-gray-900 w-12">{Math.round(todayData.raw_data.temperature_2m_max || 0)}°</span>
               <span className="text-sm text-gray-600 w-12">{Math.round(todayData.raw_data.temperature_2m_min || 0)}°</span>
@@ -135,9 +156,10 @@ export default function SevenDayForecast({ todayData, forecastData }: SevenDayFo
 
                 <div className="flex items-center gap-2 min-w-fit">
                   <div className="flex gap-1 w-24">
-                    <div className="flex-1 h-2 rounded-full" style={{
-                      background: `linear-gradient(to right, #fbbf24 0%, #f59e0b ${((day.temperature_2m_min - 15) / 15) * 100}%, #000 100%)`
-                    }}></div>
+                    <div 
+                      className="flex-1 h-2 rounded-full" 
+                      style={{ background: getTempGradient(day.temperature_2m_max, day.temperature_2m_min) }}
+                    ></div>
                   </div>
                   <span className="text-sm font-semibold text-gray-900 w-12">{Math.round(day.temperature_2m_max)}°</span>
                   <span className="text-sm text-gray-600 w-12">{Math.round(day.temperature_2m_min)}°</span>

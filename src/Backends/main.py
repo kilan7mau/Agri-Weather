@@ -2,6 +2,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
 
 from predict import (
     load_models,
@@ -21,6 +26,7 @@ from crawl import (
     process_hourly_weather_data,
     process_daily_weather_data
 )
+from groq_service import generate_farming_schedule, test_groq_connection
 
 app = FastAPI(title="Weather Prediction API")
 
@@ -389,6 +395,114 @@ async def predict_all(request: CityRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Groq AI Endpoints
+class ScheduleRequest(BaseModel):
+    crop_name: str
+    farm_location: str
+    season_goal: str
+    notes: str = ""
+    city: str
+
+
+@app.post("/api/groq/generate-schedule")
+async def generate_schedule(request: ScheduleRequest):
+    """Generate 7-day farming schedule using Groq AI"""
+    try:
+        import predict
+        
+        # Get 7-day weather forecast for the city
+        weather_30d = get_weather_data_30(request.city)
+        df_30d = process_30day_weather_data(weather_30d)
+        
+        predictions_7day = predict_weather_7days(
+            df_30d,
+            predict.scaler_x,
+            predict.scaler_y,
+            predict.pre7day_model
+        )
+        
+        # Predict weather codes for the 7 days
+        import numpy as np
+        seven_day_with_codes = []
+        
+        for i in range(len(predictions_7day)):
+            day_data = predictions_7day.iloc[i]
+            
+            day_time = pd.to_datetime(day_data['time'])
+            day_of_year = day_time.dayofyear
+            sin_doy = np.sin(2 * np.pi * day_of_year / 365.25)
+            cos_doy = np.cos(2 * np.pi * day_of_year / 365.25)
+            
+            day_features = pd.DataFrame([{
+                'time': day_time,
+                'temperature_2m_mean': day_data['temperature_2m_mean'],
+                'temperature_2m_max': day_data['temperature_2m_max'],
+                'temperature_2m_min': day_data['temperature_2m_min'],
+                'apparent_temperature_mean': day_data['apparent_temperature_mean'],
+                'apparent_temperature_max': day_data['apparent_temperature_max'],
+                'apparent_temperature_min': day_data['apparent_temperature_min'],
+                'dew_point_2m_mean': day_data['dew_point_2m_mean'],
+                'precipitation_sum': day_data['precipitation_sum'],
+                'cloud_cover_mean': day_data['cloud_cover_mean'],
+                'relative_humidity_2m_mean': day_data['relative_humidity_2m_mean'],
+                'wind_gusts_10m_mean': day_data['wind_gusts_10m_mean'],
+                'wind_speed_10m_mean': day_data['wind_speed_10m_mean'],
+                'winddirection_10m_dominant': day_data['winddirection_10m_dominant'],
+                'surface_pressure_mean': day_data['surface_pressure_mean'],
+                'pressure_msl_mean': day_data['pressure_msl_mean'],
+                'daylight_duration': day_data['daylight_duration'],
+                'sunshine_duration': day_data['sunshine_duration'],
+                'sin_doy': sin_doy,
+                'cos_doy': cos_doy
+            }])
+            
+            prepared_day = process_input_daily(day_features)
+            weather_code = predict_weather_daily(prepared_day)[0]
+            weather_desc = decode_wmo_code_batch([weather_code])[0]
+            
+            def safe_float(value):
+                if pd.isna(value) or value is None:
+                    return 0.0
+                return float(value)
+            
+            day_dict = {
+                'time': day_time.strftime('%Y-%m-%d'),
+                'temperature_2m_mean': safe_float(day_data['temperature_2m_mean']),
+                'temperature_2m_max': safe_float(day_data['temperature_2m_max']),
+                'temperature_2m_min': safe_float(day_data['temperature_2m_min']),
+                'precipitation_sum': safe_float(day_data['precipitation_sum']),
+                'relative_humidity_2m_mean': safe_float(day_data['relative_humidity_2m_mean']),
+                'wind_speed_10m_mean': safe_float(day_data['wind_speed_10m_mean']),
+                'weather_code': int(weather_code),
+                'weather_description': weather_desc
+            }
+            seven_day_with_codes.append(day_dict)
+        
+        weather_forecast = {
+            "seven_day_forecast": seven_day_with_codes
+        }
+        
+        # Generate schedule using Groq AI
+        schedule = generate_farming_schedule(
+            crop_name=request.crop_name,
+            location=request.farm_location,
+            season=request.season_goal,
+            weather_forecast=weather_forecast,
+            notes=request.notes
+        )
+        
+        return schedule
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/groq/test")
+async def test_groq():
+    """Test Groq API connection"""
+    return test_groq_connection()
 
 
 if __name__ == "__main__":

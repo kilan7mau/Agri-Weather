@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { generateScheduleWithGroq } from '../lib/groqApi';
+import { useCity } from '../contexts/CityContext';
 import DailyTaskModal from './DailyTaskModal';
-import { Calendar, AlertCircle } from 'lucide-react';
+import { Calendar, AlertCircle, Sparkles } from 'lucide-react';
 
 interface AgriculturePlan {
   id: string;
@@ -20,11 +22,13 @@ interface DailyTask {
 }
 
 export default function AgriculturePlanner() {
+  const { selectedCity } = useCity();
   const [plans, setPlans] = useState<AgriculturePlan[]>([]);
   const [tasks, setTasks] = useState<DailyTask[]>([]);
   const [currentPlan, setCurrentPlan] = useState<AgriculturePlan | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [formData, setFormData] = useState({
     crop_name: '',
     farm_location: '',
@@ -104,6 +108,45 @@ export default function AgriculturePlanner() {
     setShowModal(false);
   };
 
+  const handleGenerateSchedule = async () => {
+    if (!currentPlan) {
+      alert('⚠️ Please save a plan first!');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const schedule = await generateScheduleWithGroq({
+        crop_name: currentPlan.crop_name,
+        farm_location: currentPlan.farm_location,
+        season_goal: currentPlan.season_goal,
+        notes: currentPlan.notes || '',
+        city: selectedCity
+      });
+
+      // Delete existing tasks
+      await supabase.from('daily_tasks').delete().eq('plan_id', currentPlan.id);
+
+      // Insert new AI-generated tasks
+      for (const task of schedule.tasks) {
+        await supabase.from('daily_tasks').insert([{
+          plan_id: currentPlan.id,
+          task_date: task.day,
+          task_description: task.description,
+          task_details: task.details
+        }]);
+      }
+
+      await loadTasks(currentPlan.id);
+      alert('✅ 7-Day Schedule generated successfully with AI!');
+    } catch (error) {
+      console.error('Error:', error);
+      alert(`❌ Failed to generate schedule: ${error}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const getDayName = (dayOffset: number) => {
     const today = new Date();
     const date = new Date(today);
@@ -177,6 +220,23 @@ export default function AgriculturePlanner() {
             Save Plan
           </button>
         </form>
+
+        {currentPlan && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={handleGenerateSchedule}
+              disabled={isGenerating}
+              className="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-3 rounded-lg transition-all transform hover:scale-[1.02] disabled:hover:scale-100 shadow-lg flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-5 h-5" />
+              {isGenerating ? 'Generating with AI...' : '🤖 Generate 7-Day Schedule with AI'}
+            </button>
+            <p className="text-sm text-gray-500 mt-2 text-center">
+              AI will analyze weather forecast for {selectedCity} and create optimal farming tasks
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl p-6 shadow-md">

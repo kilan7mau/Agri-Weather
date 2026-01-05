@@ -48,3 +48,33 @@ export async function testGroqConnection(): Promise<{ status: string; message: s
   }
 }
 
+export interface ChatRequest {
+  user_message: string;
+  weather_context: Record<string, unknown>; // JSON từ predict/all
+  agriculture_context: Record<string, unknown>; // JSON từ agriculture plans
+}
+
+export interface ChatResponse {
+  reply: string;
+}
+
+export async function chatWithGroq(chatData: ChatRequest): Promise<ChatResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/groq/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(chatData)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to chat with AI');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error chatting with Groq:', error);
+    throw error;
+  }
+}
+

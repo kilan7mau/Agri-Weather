@@ -1,11 +1,15 @@
 from groq import Groq
 import os
 import json
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 # Initialize Groq client lazily to avoid crash on import
 def get_groq_client():
     """Get or create Groq client"""
-    api_key = os.environ.get("GROQ_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY environment variable is not set. Please set it to use AI features.")
     return Groq(api_key=api_key)
@@ -148,4 +152,108 @@ def test_groq_connection():
         return {"status": "success", "message": "Groq API connected successfully"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+def chat_with_groq(user_message: str, weather_context: dict, agriculture_context: dict):
+    """
+    Context-aware chatbot using Groq AI
+    
+    Args:
+        user_message: User's question
+        weather_context: Current weather data from predict/all
+        agriculture_context: Current agriculture plans
+    
+    Returns:
+        Dict containing AI reply
+    """
+    from datetime import datetime
+    
+    # Get current date and time
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    
+    # Convert contexts to formatted strings
+    weather_str = json.dumps(weather_context, ensure_ascii=False, indent=2)
+    agri_str = json.dumps(agriculture_context, ensure_ascii=False, indent=2)
+    
+    # Log contexts for debugging
+    print(f"\n📅 Current Date/Time: {current_datetime}")
+    print(f"🌤️ Weather Context Keys: {list(weather_context.keys()) if weather_context else 'Empty'}")
+    print(f"🌾 Agriculture Context Keys: {list(agriculture_context.keys()) if agriculture_context else 'Empty'}")
+    
+    system_prompt = f"""Bạn là Trợ lý Ảo Nông Nghiệp Thông Minh (Smart Agri-Assistant).
+
+THÔNG TIN NGÀY GIỜ HIỆN TẠI:
+📅 Hôm nay là: {current_date}
+🕐 Thời gian hiện tại: {current_datetime}
+
+Nhiệm vụ của bạn là hỗ trợ người nông dân bằng cách trả lời câu hỏi dựa trên DỮ LIỆU THỜI TIẾT và KẾ HOẠCH NÔNG VỤ hiện có trên màn hình.
+
+DƯỚI ĐÂY LÀ DỮ LIỆU HIỆN TẠI (Context Data):
+---
+[THÔNG TIN THỜI TIẾT - WEATHER JSON]:
+{weather_str}
+
+[KẾ HOẠCH NÔNG NGHIỆP - AGRICULTURE PLAN JSON]:
+{agri_str}
+---
+
+CHỈ DẪN TRẢ LỜI THEO 3 LUỒNG (Flow Guidelines):
+
+1. LUỒNG THỜI TIẾT (Khi người dùng hỏi về nắng, mưa, nhiệt độ...):
+   - QUAN TRỌNG: Dựa vào today_forecast để nói về thời tiết HÔM NAY ({current_date})
+   - Phân tích nhiệt độ thực tế và "cảm giác như" (feels like/apparent_temperature).
+   - Đưa ra lời khuyên cụ thể. Ví dụ: "Độ ẩm cao dễ sinh sâu bệnh", "Gió mạnh cần chắn gió cho cây".
+   - Dựa vào dự báo 7 ngày (seven_day_forecast) để cảnh báo sớm thiên tai/thời tiết xấu.
+   - Giải thích ý nghĩa weather_code và weather_description.
+   - Phân tích xu hướng nhiệt độ, lượng mưa, độ ẩm.
+
+2. LUỒNG NÔNG NGHIỆP (Khi người dùng hỏi nên làm gì, kế hoạch...):
+   - Nhìn vào JSON Kế hoạch (agriculture_context): Tìm daily_tasks để biết công việc cần làm.
+   - Kết hợp thời tiết: Nếu JSON bảo "Tưới cây" nhưng Thời tiết báo "Mưa to", hãy khuyên người dùng HOÃN tưới.
+   - Đưa ra lời khuyên về thời điểm thích hợp cho từng công việc (bón phân, phun thuốc, thu hoạch...).
+   - Nhắc nhở ghi chép nhật ký nông vụ.
+   - Cảnh báo về các rủi ro từ thời tiết (ngập úng, hạn hán, sâu bệnh...).
+
+3. LUỒNG CHUNG (Chào hỏi, hỏi cách dùng app):
+   - Hướng dẫn họ xem Tab "Today" để biết thời tiết hôm nay.
+   - Hướng dẫn xem Tab "Hourly" để theo dõi thời tiết theo giờ (24h).
+   - Hướng dẫn xem Tab "7-Day" để lập kế hoạch dài hạn.
+   - Hướng dẫn sang Tab "Agriculture" để tạo và quản lý kế hoạch nông vụ 7 ngày.
+   - Luôn giữ thái độ thân thiện, chuyên gia, ngắn gọn và dễ hiểu với bà con nông dân.
+
+LƯU Ý QUAN TRỌNG:
+- Tuyệt đối chỉ trả lời dựa trên thông tin có trong JSON ở trên.
+- Khi nói "hôm nay", phải dùng đúng ngày {current_date}, KHÔNG được tự bịa ngày khác.
+- Nếu không có thông tin, hãy nói "Dữ liệu hiện tại không hiển thị thông tin này. Bạn có thể kiểm tra lại ở tab tương ứng."
+- Trả lời bằng tiếng Việt, ngắn gọn (2-4 câu), thân thiện.
+- Ưu tiên phân tích số liệu cụ thể thay vì lý thuyết chung chung.
+- Đưa ra lời khuyên hành động cụ thể, không chỉ mô tả."""
+
+    try:
+        client = get_groq_client()
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": user_message
+                }
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=500,
+        )
+        
+        bot_reply = chat_completion.choices[0].message.content
+        return {"reply": bot_reply}
+        
+    except Exception as e:
+        print(f"Groq Chat Error: {e}")
+        raise Exception(f"Failed to chat with AI: {str(e)}")
+
+
 

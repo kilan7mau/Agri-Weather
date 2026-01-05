@@ -22,7 +22,7 @@ interface WeatherTodayProps {
 }
 
 export default function WeatherToday({ data }: WeatherTodayProps) {
-  const { selectedCity } = useCity();
+  const { selectedCity, coordinates } = useCity();
   const currentTime = new Date().toLocaleString();
 
   const { raw_data, weather_description, weather_code } = data;
@@ -64,35 +64,52 @@ export default function WeatherToday({ data }: WeatherTodayProps) {
               <span className="text-gray-600">Location:</span>
               <span className="font-medium text-gray-900">{selectedCity}</span>
             </div>
+            {coordinates && (
+              <>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-gray-600">Latitude:</span>
+                  <span className="font-medium text-gray-900">{coordinates.lat.toFixed(4)}°</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-gray-600">Longitude:</span>
+                  <span className="font-medium text-gray-900">{coordinates.lon.toFixed(4)}°</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-gray-600">Current Time:</span>
               <span className="font-medium text-gray-900">{currentTime}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-gray-600">Latest Report:</span>
-              <span className="font-medium text-gray-900">{data.time}</span>
-            </div>
-            {/*<div className="flex justify-between py-2">*/}
-            {/*  <span className="text-gray-600">Cloud Cover:</span>*/}
-            {/*  <span className="font-medium text-gray-900">{Math.round(raw_data.cloud_cover_mean || 0)}%</span>*/}
-            {/*</div>*/}
+            
           </div>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-lg">
           <h3 className="text-lg font-semibold mb-4 text-gray-800">Map Location</h3>
-          <div className="aspect-video bg-gradient-to-br from-green-100 to-blue-100 rounded-lg flex items-center justify-center relative overflow-hidden">
-            <div className="absolute inset-0 opacity-20">
-              <svg viewBox="0 0 200 100" className="w-full h-full">
-                <path d="M0,50 Q50,30 100,50 T200,50" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600"/>
-                <path d="M0,60 Q50,40 100,60 T200,60" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600"/>
-              </svg>
+          {coordinates ? (
+            <div className="aspect-video rounded-lg overflow-hidden border border-gray-200">
+              <iframe
+                width="100%"
+                height="100%"
+                frameBorder="0"
+                scrolling="no"
+                marginHeight={0}
+                marginWidth={0}
+                src={`https://www.openstreetmap.org/export/embed.html?bbox=${coordinates.lon-0.05},${coordinates.lat-0.05},${coordinates.lon+0.05},${coordinates.lat+0.05}&layer=mapnik&marker=${coordinates.lat},${coordinates.lon}`}
+                style={{ border: 0 }}
+              ></iframe>
             </div>
-            <div className="relative">
-              <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse shadow-lg"></div>
-              <div className="absolute -top-1 -left-1 w-6 h-6 bg-red-500 rounded-full opacity-30 animate-ping"></div>
+          ) : (
+            <div className="aspect-video bg-gradient-to-br from-green-100 to-blue-100 rounded-lg flex items-center justify-center relative overflow-hidden">
+              <div className="absolute inset-0 opacity-20">
+                <svg viewBox="0 0 200 100" className="w-full h-full">
+                  <path d="M0,50 Q50,30 100,50 T200,50" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600"/>
+                  <path d="M0,60 Q50,40 100,60 T200,60" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600"/>
+                </svg>
+              </div>
+              <div className="relative text-gray-500">Loading map...</div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

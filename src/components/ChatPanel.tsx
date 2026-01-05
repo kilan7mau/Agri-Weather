@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Send, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { chatWithGroq } from '../lib/groqApi';
+import { useWeather } from '../contexts/WeatherContext';
 
 interface Message {
   id: string;
@@ -13,32 +15,12 @@ interface ChatPanelProps {
   onClose: () => void;
 }
 
-const BOT_RESPONSES = {
-  weather: [
-    "I can help you understand the weather data! The current temperature shows how warm it is right now, while the 'feels like' temperature accounts for wind chill or humidity.",
-    "Looking at the forecast? The 7-day outlook helps you plan irrigation and protect crops from harsh weather.",
-    "Wind and humidity are crucial for farming! Strong winds can damage crops, and high humidity increases disease risk.",
-    "Precipitation is vital for crops. This week's rain forecast will help you decide when to water.",
-  ],
-  agriculture: [
-    "Great! I can help you plan your farm tasks. Consider the weather when scheduling watering, fertilizing, or spraying.",
-    "For a 7-day plan, think about your crop's needs, current weather, and upcoming conditions.",
-    "Common farming tasks include: watering, fertilizing, pest control, weeding, and harvesting.",
-    "Don't forget to record your tasks daily. This helps you track what worked best for future seasons!",
-  ],
-  general: [
-    "I'm here to help! I can assist with weather interpretation and farm planning.",
-    "You can use the Weather tab to understand current conditions, hourly forecasts, and 7-day outlooks.",
-    "The Agriculture tab lets you plan your farm tasks for the next 7 days and track your activities.",
-    "Feel free to ask me anything about weather patterns or farm planning strategies!",
-  ],
-};
-
 export default function ChatPanel({ onClose }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { weatherData } = useWeather();
 
   useEffect(() => {
     loadMessages();
@@ -56,30 +38,34 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     setMessages((data as Message[]) || []);
   };
 
-  const getRandomResponse = (category: string) => {
-    const responses = BOT_RESPONSES[category as keyof typeof BOT_RESPONSES] || BOT_RESPONSES.general;
-    return responses[Math.floor(Math.random() * responses.length)];
-  };
+  const loadAgriculturePlans = async () => {
+    try {
+      // Load latest plan with its tasks
+      const { data: plans, error: plansError } = await supabase
+        .from('agriculture_plans')
+        .select(`
+          *,
+          daily_tasks (
+            task_date,
+            task_description,
+            task_details
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (plansError) {
+        console.error('Error loading plans:', plansError);
+        return {};
+      }
 
-  const categorizeMessage = (text: string): string => {
-    const lowerText = text.toLowerCase();
-    if (
-      lowerText.includes('weather') ||
-      lowerText.includes('temperature') ||
-      lowerText.includes('rain') ||
-      lowerText.includes('forecast')
-    ) {
-      return 'weather';
+      const planData = plans && plans.length > 0 ? plans[0] : {};
+      console.log('📋 Loaded agriculture plan:', planData);
+      return planData;
+    } catch (error) {
+      console.error('Error loading agriculture plans:', error);
+      return {};
     }
-    if (
-      lowerText.includes('task') ||
-      lowerText.includes('crop') ||
-      lowerText.includes('farm') ||
-      lowerText.includes('plant')
-    ) {
-      return 'agriculture';
-    }
-    return 'general';
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -89,6 +75,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     const userMessage = input;
     setInput('');
 
+    // Save user message
     const { data: savedMessage } = await supabase
       .from('chat_messages')
       .insert([{ message_text: userMessage, sender: 'user' }])
@@ -100,21 +87,48 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     }
 
     setIsTyping(true);
-    setTimeout(async () => {
-      const category = categorizeMessage(userMessage);
-      const botResponse = getRandomResponse(category);
+    
+    try {
+      // Load agriculture plans from database
+      const agricultureContext = await loadAgriculturePlans();
+      
+      console.log('🌤️ Weather Context:', weatherData);
+      console.log('🌾 Agriculture Context:', agricultureContext);
+      
+      // Call Groq AI with context
+      const response = await chatWithGroq({
+        user_message: userMessage,
+        weather_context: (weatherData || {}) as Record<string, unknown>,
+        agriculture_context: agricultureContext as Record<string, unknown>
+      });
 
+      // Save bot message
       const { data: botMessage } = await supabase
         .from('chat_messages')
-        .insert([{ message_text: botResponse, sender: 'bot' }])
+        .insert([{ message_text: response.reply, sender: 'bot' }])
         .select()
         .single();
 
       if (botMessage) {
         setMessages((prev) => [...prev, botMessage as Message]);
       }
+    } catch (error) {
+      console.error('Chat error:', error);
+      
+      // Fallback error message
+      const errorMsg = 'Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng thử lại sau.';
+      const { data: errorMessage } = await supabase
+        .from('chat_messages')
+        .insert([{ message_text: errorMsg, sender: 'bot' }])
+        .select()
+        .single();
+
+      if (errorMessage) {
+        setMessages((prev) => [...prev, errorMessage as Message]);
+      }
+    } finally {
       setIsTyping(false);
-    }, 1000);
+    }
   };
 
   const handleClearChat = async () => {

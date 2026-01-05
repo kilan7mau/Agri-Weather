@@ -26,7 +26,7 @@ from crawl import (
     process_hourly_weather_data,
     process_daily_weather_data
 )
-from groq_service import generate_farming_schedule, test_groq_connection
+from groq_service import generate_farming_schedule, test_groq_connection, chat_with_groq
 
 app = FastAPI(title="Weather Prediction API")
 
@@ -503,6 +503,26 @@ async def generate_schedule(request: ScheduleRequest):
 async def test_groq():
     """Test Groq API connection"""
     return test_groq_connection()
+
+
+class ChatRequest(BaseModel):
+    user_message: str
+    weather_context: dict
+    agriculture_context: dict
+
+
+@app.post("/api/groq/chat")
+async def chat(request: ChatRequest):
+    """Chat with context-aware AI assistant"""
+    try:
+        response = chat_with_groq(
+            user_message=request.user_message,
+            weather_context=request.weather_context,
+            agriculture_context=request.agriculture_context
+        )
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

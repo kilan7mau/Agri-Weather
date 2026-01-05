@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, MapPin, X } from 'lucide-react';
 import { useCity } from '../contexts/CityContext';
 
@@ -70,11 +70,39 @@ export const CITIES = [
 
 
 export default function CitySearch() {
-  const { selectedCity, setSelectedCity } = useCity();
+  const { selectedCity, setSelectedCity, setCoordinates } = useCity();
   const [input, setInput] = useState(selectedCity);
   const [isOpen, setIsOpen] = useState(false);
   const [filtered, setFiltered] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Fetch coordinates from OpenStreetMap Nominatim API
+  const fetchCoordinates = useCallback(async (cityName: string) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName)},Vietnam&format=json&limit=1`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'AgriWeatherApp/1.0'
+          }
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.length > 0) {
+          const { lat, lon } = data[0];
+          setCoordinates({
+            lat: parseFloat(lat),
+            lon: parseFloat(lon)
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch coordinates:', error);
+    }
+  }, [setCoordinates]);
 
   useEffect(() => {
     if (input.trim()) {
@@ -88,6 +116,13 @@ export default function CitySearch() {
       setIsOpen(false);
     }
   }, [input]);
+
+  // Fetch coordinates on initial load
+  useEffect(() => {
+    if (selectedCity) {
+      fetchCoordinates(selectedCity);
+    }
+  }, [selectedCity, fetchCoordinates]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -104,6 +139,7 @@ export default function CitySearch() {
     setSelectedCity(city);
     setInput(city);
     setIsOpen(false);
+    fetchCoordinates(city);
   };
 
   const handleClear = () => {

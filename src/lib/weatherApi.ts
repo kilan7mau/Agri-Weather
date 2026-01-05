@@ -88,7 +88,7 @@ export interface SevenDayItem {
   precipitation_sum: number;
   wind_speed_10m_max: number;
   wind_speed_10m_mean: number;
-  wind_gusts_10m_max: number;
+  wind_gusts_10m_mean: number;
   winddirection_10m_dominant: number;
 }
 

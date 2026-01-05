@@ -1,5 +1,6 @@
-import { Cloud, CloudRain, Sun, CloudSun, CloudFog, CloudSnow, CloudLightning, CloudDrizzle, Wind, Umbrella, LucideIcon } from 'lucide-react';
+import { Cloud, CloudRain, Sun, CloudSun, CloudFog, CloudSnow, CloudLightning, CloudDrizzle, Wind, Umbrella, Droplets, Gauge, Clock, LucideIcon } from 'lucide-react';
 import { getWindDirection, getWeatherIcon, type SevenDayItem, type WeatherRawData } from '../../lib/weatherApi';
+import { useState } from 'react';
 
 interface SevenDayForecastProps {
   todayData: {
@@ -12,6 +13,38 @@ interface SevenDayForecastProps {
 }
 
 export default function SevenDayForecast({ todayData, forecastData }: SevenDayForecastProps) {
+  // State to track selected day (null = today, 0-6 = forecast days)
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
+
+  // Get the currently selected day data
+  const selectedDay = selectedDayIndex === null 
+    ? todayData 
+    : {
+        time: forecastData[selectedDayIndex].time,
+        weather_code: forecastData[selectedDayIndex].weather_code,
+        weather_description: forecastData[selectedDayIndex].weather_description,
+        raw_data: {
+          temperature_2m_max: forecastData[selectedDayIndex].temperature_2m_max,
+          temperature_2m_min: forecastData[selectedDayIndex].temperature_2m_min,
+          temperature_2m_mean: forecastData[selectedDayIndex].temperature_2m_mean,
+          apparent_temperature_max: forecastData[selectedDayIndex].apparent_temperature_max,
+          apparent_temperature_min: forecastData[selectedDayIndex].apparent_temperature_min,
+          apparent_temperature_mean: (forecastData[selectedDayIndex].apparent_temperature_max + forecastData[selectedDayIndex].apparent_temperature_min) / 2,
+          wind_gusts_10m_mean: forecastData[selectedDayIndex].wind_gusts_10m_mean,
+          precipitation_sum: forecastData[selectedDayIndex].precipitation_sum,
+          wind_speed_10m_mean: forecastData[selectedDayIndex].wind_speed_10m_mean,
+          winddirection_10m_dominant: forecastData[selectedDayIndex].winddirection_10m_dominant,
+          dew_point_2m_mean: 0,
+          cloud_cover_mean: 0,
+          relative_humidity_2m_mean: 0,
+          surface_pressure_mean: 0,
+          pressure_msl_mean: 0,
+          daylight_duration: 0,
+          sunshine_duration: 0,
+        } as WeatherRawData
+      };
+
+  // ...existing code...
   // Icon map for converting icon name to component
   const iconMap: Record<string, LucideIcon> = {
     Sun, Cloud, CloudSun, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning
@@ -52,40 +85,73 @@ export default function SevenDayForecast({ todayData, forecastData }: SevenDayFo
     return date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
   };
 
-  const TodayIcon = getIconComponent(todayData.weather_code);
+  const TodayIcon = getIconComponent(selectedDay.weather_code);
 
   return (
     <div className="space-y-6">
-      {/* Today Card - Using today_forecast data */}
+      {/* Selected Day Card - Dynamic based on selection */}
       <div className="bg-gradient-to-r from-teal-400 to-teal-600 rounded-2xl p-8 text-white shadow-lg">
         <div className="grid md:grid-cols-2 gap-8">
           <div>
             <TodayIcon className="w-16 h-16 mb-4 opacity-80" />
             <p className="text-5xl font-bold mb-2">
-              {Math.round(todayData.raw_data.temperature_2m_max || 0)} / {Math.round(todayData.raw_data.temperature_2m_min || 0)}°C
+              {Math.round(selectedDay.raw_data.temperature_2m_max || 0)} / {Math.round(selectedDay.raw_data.temperature_2m_min || 0)}°C
             </p>
             <p className="text-xl opacity-90">
-              {todayData.weather_description}
+              {selectedDay.weather_description}
             </p>
+            {selectedDayIndex === null ? (
+              <p className="text-sm opacity-75 mt-2">Today</p>
+            ) : (
+              <p className="text-sm opacity-75 mt-2">{getDayName(selectedDay.time, selectedDayIndex)}</p>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <p className="opacity-75 text-sm">Feels Like:</p>
-              <p className="text-2xl font-semibold">{Math.round(todayData.raw_data.apparent_temperature_max || 0)}°C</p>
+              <p className="text-2xl font-semibold">{Math.round(selectedDay.raw_data.apparent_temperature_max || 0)} / {Math.round(selectedDay.raw_data.apparent_temperature_min || 0)}°C</p>
             </div>
             <div>
               <p className="opacity-75 text-sm">Wind Gust:</p>
-              <p className="text-2xl font-semibold">{Math.round(todayData.raw_data.wind_gusts_10m_mean || 0)} km/h</p>
+              <p className="text-2xl font-semibold">{Math.round(selectedDay.raw_data.wind_gusts_10m_mean || 0)} km/h</p>
             </div>
             <div>
               <p className="opacity-75 text-sm">Precipitation:</p>
-              <p className="text-2xl font-semibold">Rain: {(todayData.raw_data.precipitation_sum || 0).toFixed(1)}mm</p>
+              <p className="text-2xl font-semibold">{(selectedDay.raw_data.precipitation_sum || 0).toFixed(1)}mm</p>
             </div>
             <div>
               <p className="opacity-75 text-sm">Wind:</p>
               <p className="text-2xl font-semibold">
-                {Math.round(todayData.raw_data.wind_speed_10m_mean || 0)} km/h {getWindDirection(todayData.raw_data.winddirection_10m_dominant || 0)}
+                {Math.round(selectedDay.raw_data.wind_speed_10m_mean || 0)} km/h {getWindDirection(selectedDay.raw_data.winddirection_10m_dominant || 0)}
               </p>
+            </div>
+            <div>
+              <p className="opacity-75 text-sm flex items-center gap-1">
+                <Cloud className="w-4 h-4" />
+                Cloud Cover:
+              </p>
+              <p className="text-2xl font-semibold">{Math.round(selectedDay.raw_data.cloud_cover_mean || 0)}%</p>
+            </div>
+            <div>
+              <p className="opacity-75 text-sm flex items-center gap-1">
+                <Droplets className="w-4 h-4" />
+                Humidity:
+              </p>
+              <p className="text-2xl font-semibold">{Math.round(selectedDay.raw_data.relative_humidity_2m_mean || 0)}%</p>
+            </div>
+            <div>
+              <p className="opacity-75 text-sm flex items-center gap-1">
+                <Gauge className="w-4 h-4" />
+                Pressure:
+              </p>
+              <p className="text-2xl font-semibold">{Math.round(selectedDay.raw_data.surface_pressure_mean || 0)} mb</p>
+            </div>
+            <div>
+              <p className="opacity-75 text-sm flex items-center gap-1">
+                <Clock className="w-4 h-4" />
+                Daylight:
+              </p>
+              <p className="text-2xl font-semibold">{((selectedDay.raw_data.daylight_duration || 0) / 3600).toFixed(1)}h</p>
             </div>
           </div>
         </div>
@@ -96,36 +162,42 @@ export default function SevenDayForecast({ todayData, forecastData }: SevenDayFo
         <h3 className="text-lg font-semibold text-gray-900 mb-4">8-Day Extended Forecast</h3>
         <div className="space-y-3">
           {/* Today Row */}
-          <div className="flex items-center gap-4 p-4 rounded-lg transition-colors bg-blue-50 border-l-4 border-blue-500">
-            <div className="min-w-fit">
+          <div 
+            onClick={() => setSelectedDayIndex(null)}
+            className={`grid grid-cols-[120px_40px_1fr_140px_200px] items-center gap-4 p-4 rounded-lg transition-all cursor-pointer ${
+              selectedDayIndex === null 
+                ? 'bg-blue-100 border-l-4 border-blue-600 shadow-md' 
+                : 'bg-blue-50 border-l-4 border-blue-500 hover:bg-blue-100'
+            }`}
+          >
+            <div>
               <p className="font-semibold text-blue-600">Today</p>
               <p className="text-sm text-gray-600">{formatDate(todayData.time)}</p>
             </div>
 
-            <TodayIcon className="w-8 h-8 text-gray-400 mx-2" />
+            <TodayIcon className="w-8 h-8 text-gray-400" />
 
-            <div className="flex-1">
+            <div>
               <p className="font-medium text-gray-900">{todayData.weather_description}</p>
             </div>
 
-            <div className="flex items-center gap-2 min-w-fit">
+            <div className="flex items-center gap-2">
               <div className="flex gap-1 w-24">
                 <div 
                   className="flex-1 h-2 rounded-full" 
                   style={{ background: getTempGradient(todayData.raw_data.temperature_2m_max || 0, todayData.raw_data.temperature_2m_min || 0) }}
                 ></div>
               </div>
-              <span className="text-sm font-semibold text-gray-900 w-12">{Math.round(todayData.raw_data.temperature_2m_max || 0)}°</span>
-              <span className="text-sm text-gray-600 w-12">{Math.round(todayData.raw_data.temperature_2m_min || 0)}°</span>
+              <span className="text-sm font-semibold text-gray-900 w-12">{Math.round(todayData.raw_data.temperature_2m_mean || 0)}°</span>
             </div>
-
-            <div className="flex items-center gap-4 min-w-fit pl-4 border-l border-gray-200">
-              <div className="text-center text-sm">
-                <Umbrella className="w-4 h-4 inline mr-1 text-blue-500" />
+            
+            <div className="flex items-center gap-4 pl-4 border-l border-gray-200">
+              <div className="flex items-center text-sm">
+                <Umbrella className="w-4 h-4 mr-1 text-blue-500" />
                 <span className="text-gray-600">{(todayData.raw_data.precipitation_sum || 0).toFixed(1)}mm</span>
               </div>
-              <div className="text-center text-sm">
-                <Wind className="w-4 h-4 inline mr-1 text-gray-500" />
+              <div className="flex items-center text-sm">
+                <Wind className="w-4 h-4 mr-1 text-gray-500" />
                 <span className="text-gray-600">{Math.round(todayData.raw_data.wind_speed_10m_mean || 0)} km/h {getWindDirection(todayData.raw_data.winddirection_10m_dominant || 0)}</span>
               </div>
             </div>
@@ -137,41 +209,46 @@ export default function SevenDayForecast({ todayData, forecastData }: SevenDayFo
             const dayName = getDayName(day.time, index);
             const dateFormatted = formatDate(day.time);
             const windDir = getWindDirection(day.winddirection_10m_dominant);
+            const isSelected = selectedDayIndex === index;
             
             return (
               <div
                 key={index}
-                className="flex items-center gap-4 p-4 rounded-lg transition-colors hover:bg-gray-50"
+                onClick={() => setSelectedDayIndex(index)}
+                className={`grid grid-cols-[120px_40px_1fr_140px_200px] items-center gap-4 p-4 rounded-lg transition-all cursor-pointer ${
+                  isSelected 
+                    ? 'bg-gray-100 shadow-md scale-[1.02]' 
+                    : 'hover:bg-gray-50'
+                }`}
               >
-                <div className="min-w-fit">
+                <div>
                   <p className="font-semibold text-gray-900">{dayName}</p>
                   <p className="text-sm text-gray-600">{dateFormatted}</p>
                 </div>
 
-                <Icon className="w-8 h-8 text-gray-400 mx-2" />
+                <Icon className="w-8 h-8 text-gray-400" />
 
-                <div className="flex-1">
+                <div>
                   <p className="font-medium text-gray-900">{day.weather_description}</p>
                 </div>
 
-                <div className="flex items-center gap-2 min-w-fit">
+                <div className="flex items-center gap-2">
                   <div className="flex gap-1 w-24">
                     <div 
                       className="flex-1 h-2 rounded-full" 
                       style={{ background: getTempGradient(day.temperature_2m_max, day.temperature_2m_min) }}
                     ></div>
                   </div>
-                  <span className="text-sm font-semibold text-gray-900 w-12">{Math.round(day.temperature_2m_max)}°</span>
-                  <span className="text-sm text-gray-600 w-12">{Math.round(day.temperature_2m_min)}°</span>
+                  <span className="text-sm font-semibold text-gray-900 w-12">{Math.round(day.temperature_2m_mean)}°</span>
                 </div>
 
-                <div className="flex items-center gap-4 min-w-fit pl-4 border-l border-gray-200">
-                  <div className="text-center text-sm">
-                    <Umbrella className="w-4 h-4 inline mr-1 text-blue-500" />
+                <div className="flex items-center gap-4 pl-4 border-l border-gray-200">
+                  <div className="flex items-center text-sm">
+                    <Umbrella className="w-4 h-4 mr-1 text-blue-500" />
                     <span className="text-gray-600">{day.precipitation_sum.toFixed(1)}mm</span>
                   </div>
-                  <div className="text-center text-sm">
-                    <Wind className="w-4 h-4 inline mr-1 text-gray-500" />
+                  <div className="flex items-center text-sm">
+                    <Wind className="w-4 h-4 mr-1 text-gray-500" />
                     <span className="text-gray-600">{Math.round(day.wind_speed_10m_mean)} km/h {windDir}</span>
                   </div>
                 </div>

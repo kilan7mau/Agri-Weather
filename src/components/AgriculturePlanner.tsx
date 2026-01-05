@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { generateScheduleWithGroq } from '../lib/groqApi';
 import { useCity } from '../contexts/CityContext';
 import DailyTaskModal from './DailyTaskModal';
-import { Calendar, AlertCircle, Sparkles } from 'lucide-react';
+import { Calendar, AlertCircle } from 'lucide-react';
 
 interface AgriculturePlan {
   id: string;
@@ -236,7 +236,7 @@ export default function AgriculturePlanner() {
               disabled={isGenerating}
               className="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-3 rounded-lg transition-all transform hover:scale-[1.02] disabled:hover:scale-100 shadow-lg flex items-center justify-center gap-2"
             >
-              <Sparkles className="w-5 h-5" />
+              
               {isGenerating ? 'Generating with AI...' : 'Generate 7-Day Schedule '}
             </button>
             <p className="text-sm text-gray-500 mt-2 text-center">

@@ -138,7 +138,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center md:justify-end z-50 p-4">
-      <div className="bg-white rounded-2xl md:rounded-2xl w-full md:w-96 h-[600px] md:h-96 shadow-2xl flex flex-col overflow-hidden">
+      <div className="bg-white rounded-2xl md:rounded-2xl w-full md:w-96 h-[600px] md:h-[600px] shadow-2xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-500 to-green-600 text-white">
           <h2 className="font-bold text-lg">Assistant</h2>
           <div className="flex items-center gap-2">

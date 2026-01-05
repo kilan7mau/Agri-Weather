@@ -17,6 +17,8 @@ A comprehensive web application that combines **weather forecasting**, **AI-powe
 - ✅ **Context-Aware Chatbot**: Ask questions about weather and get personalized farming advice
 - ✅ **Advanced ML Models**: 3 specialized models for hourly, daily, and 7-day forecasts
 - ✅ **Real-Time Weather**: Live data from Open-Meteo API with beautiful visualizations
+- ✅ **Optimized Performance**: Single API call predicts all weather data (today, hourly, 7-day)
+- ✅ **Interactive Charts**: Temperature trends, precipitation, wind speed/gusts with direction indicators
 - ✅ **Farmer-Friendly**: Vietnamese language support and intuitive interface
 - ✅ **Completely Free**: All APIs have generous free tiers
 - ✅ **Production Ready**: Built with React, TypeScript, FastAPI, and TensorFlow
@@ -26,9 +28,20 @@ A comprehensive web application that combines **weather forecasting**, **AI-powe
 ## ✨ Features
 
 ### 🌤️ Weather Forecasting
-- **Today's Weather**: Current weather conditions with detailed metrics
-- **24-Hour Forecast**: Hourly weather predictions with temperature trends and precipitation
-- **7-Day Forecast**: Weekly weather outlook with temperature ranges
+- **Today's Weather**: Current weather conditions with 8 detailed metrics
+  - Temperature (actual & feels-like)
+  - Dew point, precipitation, cloud cover, humidity
+  - Wind speed/gusts, pressure, daylight/sunshine duration
+- **24-Hour Forecast**: Hourly weather predictions with interactive visualizations
+  - Temperature trends chart (actual & feels-like)
+  - Precipitation bar chart
+  - Wind speed, gusts & direction chart with directional indicators
+  - Detailed metrics: humidity, cloud cover, precipitation for each hour
+- **7-Day Forecast**: Weekly weather outlook with clickable daily cards
+  - Interactive day selection to view detailed forecasts
+  - Temperature ranges with color gradients
+  - Weather icons based on WMO weather codes
+  - Wind, precipitation, and all 8 weather metrics per day
 - **Real-time Data**: Powered by Open-Meteo API and ML models
 
 ### 🤖 AI Agriculture Planning
@@ -42,7 +55,7 @@ A comprehensive web application that combines **weather forecasting**, **AI-powe
 - **7-Day Calendar**: Visual task management with day-by-day breakdown
 
 ### 💬 Context-Aware AI Chatbot
-- **Smart Assistant**: AI-powered chatbot understands weather data and farming plans
+- **Smart Assistant**: Groq-powered chatbot (Llama-3.3-70b-versatile) understands weather data and farming plans
 - **3 Conversation Flows**:
   - **Weather**: Explains temperature, precipitation, humidity, and their impact on crops
   - **Agriculture**: Suggests optimal times for watering, fertilizing, pest control
@@ -51,6 +64,7 @@ A comprehensive web application that combines **weather forecasting**, **AI-powe
 - **Intelligent Advice**: Combines weather forecasts with tasks (e.g., "Don't water today, rain expected")
 - **Vietnamese Support**: Friendly, farmer-focused language
 - **Chat History**: All conversations saved to Supabase
+- **Current Date Awareness**: AI knows the actual date and provides time-relevant advice
 
 ### 🎯 Machine Learning Models
 - **Hourly Prediction**: Deep learning + Histogram Gradient Boosting
@@ -188,8 +202,18 @@ Choose your location from the search bar (supports Vietnamese cities)
 
 #### 3. **View Weather Forecasts**
 - **Today Tab**: Current weather with key metrics
-- **Hourly Tab**: 24-hour forecast with temperature trends and precipitation charts
-- **7-Day Tab**: Weekly outlook with daily temperature ranges
+  - Main weather card with temperature, feels-like, and description
+  - 8 metric boxes: Dew Point, Precipitation, Cloud Cover, Humidity, Wind Gust, Pressure, Daylight Duration, Sunshine Duration
+- **Hourly Tab**: 24-hour forecast with interactive charts
+  - Scrollable hourly cards showing weather at each hour
+  - Temperature trend chart (actual & feels-like temperatures)
+  - Precipitation bar chart (rainfall per hour)
+  - Wind analysis chart (speed, gusts, and direction indicators)
+- **7-Day Tab**: Weekly outlook with detailed daily information
+  - Clickable 8-day forecast list (Today + 7 future days)
+  - Selected day details card with temperature gradient and 8 metrics
+  - Temperature ranges with color-coded bars
+  - Wind direction arrows and precipitation amounts
 
 #### 4. **Agriculture Planning**
 - Click "Agriculture Planner" tab
@@ -218,23 +242,47 @@ Choose your location from the search bar (supports Vietnamese cities)
 ## 📡 API Endpoints
 
 ### Weather Endpoints
-- `POST /api/predict/all` - Get all predictions (today, hourly, 7-day) in one call
-- `POST /api/predict/daily` - Get today's weather prediction
-- `POST /api/predict/hourly` - Get 24-hour forecast
-- `POST /api/predict/7days` - Get 7-day forecast
+- `POST /api/predict/all` - **Get all predictions (today, hourly, 7-day) in one call** ⭐ Recommended
+  - Returns complete weather data for all 3 tabs
+  - Optimized for performance - single API call loads entire dashboard
+  - Response includes: `today_forecast`, `hourly_forecast`, `seven_day_forecast`
+- `POST /api/predict/daily` - Get today's weather prediction only
+- `POST /api/predict/hourly` - Get 24-hour forecast only
+- `POST /api/predict/7days` - Get 7-day forecast only
 
 ### Groq AI Endpoints
 - `POST /api/groq/generate-schedule` - Generate 7-day farming schedule
+  - Input: crop name, location, season goal
+  - Returns: 7 daily tasks optimized for weather conditions
 - `POST /api/groq/chat` - Chat with context-aware AI assistant
+  - Input: user message, weather context, agriculture context
+  - Returns: Intelligent response based on current data and date
 - `GET /api/groq/test` - Test Groq API connection
 
 ### Request Examples
 
-**Get All Weather Data:**
+**Get All Weather Data (Recommended):**
 ```bash
 curl -X POST http://localhost:8000/api/predict/all \
   -H "Content-Type: application/json" \
   -d '{"city": "Da Nang"}'
+```
+
+**Response includes:**
+- `today_forecast`: Current day weather with 14+ metrics
+- `hourly_forecast`: 24-hour predictions (temperature, precipitation, wind, etc.)
+- `seven_day_forecast`: 7-day outlook with daily aggregated data
+
+**Generate Farming Schedule:**
+```bash
+curl -X POST http://localhost:8000/api/groq/generate-schedule \
+  -H "Content-Type: application/json" \
+  -d '{
+    "crop_name": "Rice",
+    "farm_location": "Field A",
+    "season_goal": "Spring planting",
+    "weather_data": {...}
+  }'
 ```
 
 **Chat with AI:**
@@ -526,6 +574,7 @@ See `supabase/migrations/` for full schema and RLS policies.
 - Restart backend server (Ctrl+C then `python main.py`)
 - Backend automatically includes current date in AI prompt
 - Check backend logs show correct date: `📅 Current Date/Time: 2026-01-05...`
+
 
 ### Weather data not loading
 - Check city name spelling (supports Vietnamese cities)

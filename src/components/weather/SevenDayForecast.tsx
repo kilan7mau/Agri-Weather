@@ -29,18 +29,18 @@ export default function SevenDayForecast({ todayData, forecastData }: SevenDayFo
           temperature_2m_mean: forecastData[selectedDayIndex].temperature_2m_mean,
           apparent_temperature_max: forecastData[selectedDayIndex].apparent_temperature_max,
           apparent_temperature_min: forecastData[selectedDayIndex].apparent_temperature_min,
-          apparent_temperature_mean: (forecastData[selectedDayIndex].apparent_temperature_max + forecastData[selectedDayIndex].apparent_temperature_min) / 2,
+          apparent_temperature_mean: forecastData[selectedDayIndex].apparent_temperature_mean,
           wind_gusts_10m_mean: forecastData[selectedDayIndex].wind_gusts_10m_mean,
           precipitation_sum: forecastData[selectedDayIndex].precipitation_sum,
           wind_speed_10m_mean: forecastData[selectedDayIndex].wind_speed_10m_mean,
           winddirection_10m_dominant: forecastData[selectedDayIndex].winddirection_10m_dominant,
-          dew_point_2m_mean: 0,
-          cloud_cover_mean: 0,
-          relative_humidity_2m_mean: 0,
-          surface_pressure_mean: 0,
-          pressure_msl_mean: 0,
-          daylight_duration: 0,
-          sunshine_duration: 0,
+          dew_point_2m_mean: forecastData[selectedDayIndex].dew_point_2m_mean,
+          cloud_cover_mean: forecastData[selectedDayIndex].cloud_cover_mean,
+          relative_humidity_2m_mean: forecastData[selectedDayIndex].relative_humidity_2m_mean,
+          surface_pressure_mean: forecastData[selectedDayIndex].surface_pressure_mean,
+          pressure_msl_mean: forecastData[selectedDayIndex].pressure_msl_mean,
+          daylight_duration: forecastData[selectedDayIndex].daylight_duration,
+          sunshine_duration: forecastData[selectedDayIndex].sunshine_duration,
         } as WeatherRawData
       };
 
@@ -108,19 +108,31 @@ export default function SevenDayForecast({ todayData, forecastData }: SevenDayFo
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <p className="opacity-75 text-sm">Feels Like:</p>
+              <p className="opacity-75 text-sm flex items-center gap-1">
+                <CloudSun className="w-4 h-4" />
+                Feels Like:
+              </p>
               <p className="text-2xl font-semibold">{Math.round(selectedDay.raw_data.apparent_temperature_max || 0)} / {Math.round(selectedDay.raw_data.apparent_temperature_min || 0)}°C</p>
             </div>
             <div>
-              <p className="opacity-75 text-sm">Wind Gust:</p>
+              <p className="opacity-75 text-sm flex items-center gap-1">
+                <Wind className="w-4 h-4" />
+                Wind Gust:
+              </p>
               <p className="text-2xl font-semibold">{Math.round(selectedDay.raw_data.wind_gusts_10m_mean || 0)} km/h</p>
             </div>
             <div>
-              <p className="opacity-75 text-sm">Precipitation:</p>
+              <p className="opacity-75 text-sm flex items-center gap-1">
+                <Umbrella className="w-4 h-4" />
+                Precipitation:
+              </p>
               <p className="text-2xl font-semibold">{(selectedDay.raw_data.precipitation_sum || 0).toFixed(1)}mm</p>
             </div>
             <div>
-              <p className="opacity-75 text-sm">Wind:</p>
+              <p className="opacity-75 text-sm flex items-center gap-1">
+                <Wind className="w-4 h-4" />
+                Wind Speed:
+              </p>
               <p className="text-2xl font-semibold">
                 {Math.round(selectedDay.raw_data.wind_speed_10m_mean || 0)} km/h {getWindDirection(selectedDay.raw_data.winddirection_10m_dominant || 0)}
               </p>

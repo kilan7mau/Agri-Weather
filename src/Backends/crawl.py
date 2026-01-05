@@ -5,11 +5,18 @@ import sys
 import pandas as pd
 import requests
 from datetime import datetime, timezone, timedelta
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
 def get_coordinates(location):
+    api_key = os.getenv('OPENWEATHER_API_KEY')
+    if not api_key:
+        raise ValueError("OPENWEATHER_API_KEY not found in environment variables")
+
     encoded_location = urllib.parse.quote(location)
-    url = f"https://api.openweathermap.org/data/2.5/find?q={location}&appid=5796abbde9106b7da4febfae8c44c232&units=metric"
+    url = f"https://api.openweathermap.org/data/2.5/find?q={location}&appid={api_key}&units=metric"
 
     headers = {
         'Accept': '*/*',

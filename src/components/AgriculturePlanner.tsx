@@ -23,7 +23,10 @@ interface DailyTask {
 
 export default function AgriculturePlanner() {
   const { selectedCity } = useCity();
-  const [plans, setPlans] = useState<AgriculturePlan[]>([]);
+  // Plans state - reserved for future feature: multiple plans management
+  // Currently using only currentPlan (first plan), but keeping this for scalability
+  // Prefix with _ to indicate "reserved for future use" and suppress ESLint warnings
+  const [_plans, _setPlans] = useState<AgriculturePlan[]>([]);
   const [tasks, setTasks] = useState<DailyTask[]>([]);
   const [currentPlan, setCurrentPlan] = useState<AgriculturePlan | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -38,11 +41,15 @@ export default function AgriculturePlanner() {
 
   useEffect(() => {
     loadPlans();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadPlans = async () => {
     const { data } = await supabase.from('agriculture_plans').select('*');
     if (data && data.length > 0) {
+      // Store all plans (for future multi-plan feature)
+      _setPlans(data as AgriculturePlan[]);
+      // Set first plan as current
       setCurrentPlan(data[0] as AgriculturePlan);
       setFormData({
         crop_name: data[0].crop_name,
@@ -138,7 +145,7 @@ export default function AgriculturePlanner() {
       }
 
       await loadTasks(currentPlan.id);
-      alert('✅ 7-Day Schedule generated successfully with AI!');
+      alert('✅ 7-Day Schedule generated successfully !');
     } catch (error) {
       console.error('Error:', error);
       alert(`❌ Failed to generate schedule: ${error}`);
@@ -230,7 +237,7 @@ export default function AgriculturePlanner() {
               className="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-3 rounded-lg transition-all transform hover:scale-[1.02] disabled:hover:scale-100 shadow-lg flex items-center justify-center gap-2"
             >
               <Sparkles className="w-5 h-5" />
-              {isGenerating ? 'Generating with AI...' : '🤖 Generate 7-Day Schedule with AI'}
+              {isGenerating ? 'Generating with AI...' : 'Generate 7-Day Schedule '}
             </button>
             <p className="text-sm text-gray-500 mt-2 text-center">
               AI will analyze weather forecast for {selectedCity} and create optimal farming tasks
